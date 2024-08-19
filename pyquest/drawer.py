@@ -52,9 +52,12 @@ from itertools import groupby
 from statistics import mean
 
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import matplotlib.lines as mlines
 from matplotlib import colormaps
 
 # all concrete classes herein are drawable
+import numpy as np
 from pyquest.gates import *
 from pyquest.unitaries import *
 from pyquest.operators import *
@@ -65,8 +68,8 @@ from pyquest.initialisations import *
 
 '''
 TODO:
-    - custom label for SqrtSwap
-    - bespoke target graphic for CX as bullseye
+    - option for QuantumColours colour theme
+    - type hints + docstrings
 '''
 
 
@@ -99,6 +102,9 @@ class size:
 
     # radius of circle upon control qubits, and phase gate targets
     CONTROL_CIRCLE_RADIUS = .1
+
+    # radius of circle upon CX and CCX target qubits
+    TARGET_CIRCLE_RADIUS = .2
 
 
 
@@ -243,10 +249,6 @@ def get_gate_label(gate):
     if isinstance(gate, PureState):
         return 'ψ'
 
-    # measurements get abbreviated
-    if isinstance(gate, M):
-        return '↗'
-
     # compactly specified unitaries are identical to general unitaries
     if isinstance(gate, CompactU):
         return 'U'
@@ -264,6 +266,36 @@ def get_gate_label(gate):
     # generic gates use their class name
     return type(gate).__name__
 
+def get_measure_symbol(gate, rect):
+    
+    # calculate the center, height, and width of the rectangle
+    x, y = (mean(x[i] for x in rect) for i in [0, 1])
+    h, w = ((rect[2][i] - rect[0][i]) / len(gate.targets) for i in [0, 1])
+
+    # create the arc object
+    arc = patches.Arc(
+        xy=(x, y - 0.15 * h),
+        width=w * 0.7,
+        height=w * 0.7,
+        angle=0,
+        theta1=0,
+        theta2=180,
+        fill=False,
+        linewidth=1.5,
+        zorder=layer.GATE_BODY        
+    )
+
+    # create the line object
+    y_0 = y - 0.15 * h
+    line = mlines.Line2D(
+        [x, x + 0.35 * w],
+        [y_0, y_0 + 0.35 * w],
+        color='black',
+        zorder=layer.GATE_BODY,
+    )
+
+    # Return both objects as a tuple
+    return arc, line
 
 def get_gate_rect_style(gate):
 
@@ -278,55 +310,39 @@ def get_gate_rect_style(gate):
     # all other operators have solid lines
     return "solid"
 
-
+# TODO bespoke QM colours when colourtheme='qm'
 def get_gate_rect_color(gate):
 
-    # decoherence channels are red
-    if hasattr(pyquest.decoherence, type(gate).__name__):
-        return "red"
-
-    # initialisations are blue
-    if hasattr(pyquest.initialisations, type(gate).__name__):
-        return "blue"
-
-    # measurements are green
-    if isinstance(gate, M):
-        return "green"
+    # # decoherence channels are red
+    # if hasattr(pyquest.decoherence, type(gate).__name__):
+    #     return "red"
 
     # all other operators are black
     return "black"
 
-
+# TODO bespoke QM colours when colourtheme='qm'
 def get_gate_face_color(gate):
 
-    # some specific operators have their own symbols and ergo colours
-    if isinstance(gate, Swap):
-        return "orange"
     if isinstance(gate, Phase):
-        return "purple"
+        return "black"
 
     # generic gates have rectangle bodies with white faces
     return "white"
 
-
+# TODO bespoke QM colours when colourtheme='qm'
 def get_vertical_connector_color(gate):
-
-    # some specific operators have their own connector colors
-    if isinstance(gate, Swap):
-        return "yellow"
-    if isinstance(gate, Phase):
-        return "pink"
 
     # default
     return "gray"
 
 
-def get_control_qubit_color(gate):
+def get_control_qubit_color(gate, i):
 
-    # phase gate controls should be indistinguishable from targets
-    if isinstance(gate, Phase):
-        return get_gate_face_color(gate)
+    # black for controls, white for anti-controls when drawing U gate
+    if isinstance(gate, U) and gate.control_pattern:
+        return "black" if gate.control_pattern[i] == 1 else "white"
 
+    # default
     return "black"
 
 
@@ -348,6 +364,7 @@ Logic for producing graphics, which...
     - draws swap gates with X symbols
     - labels gates with concise strings
     - merges gate bodies which target adjacent qubits
+    - draws target bullseye for CX and CXX
 '''
 
 
@@ -386,6 +403,7 @@ def get_gate_graphic_components(gate, column, num_qubits):
 
     # explicitly targeted gates have adjacent targets merged into rectangles
     if has_explicit_targets(gate):
+
         for group in get_grouped_consecutive_items(gate.targets):
             x0, y0 = padcol,     min(group)   + pad
             x1, y1 = padnextcol, max(group)+1 - pad
@@ -421,6 +439,19 @@ def draw_gate_body(gate, column, rectangles, plt, ax):
             ax.add_patch(plt.Circle((column+.5, q+.5), radius, **special_opts))
         return
 
+    # CX and CCX gates draw bullseyes rather than rectangles at every target
+    if isinstance(gate, X) and len(gate.controls) != 0:
+        radius = size.TARGET_CIRCLE_RADIUS
+        for q in gate.targets:
+            # draw a circle
+            x,y  = column + .5, q + .5
+            ax.add_patch(plt.Circle((x,y), radius, linestyle='-', edgecolor='black', facecolor='white', linewidth=1.5))
+            # draw the inner cross
+            ax.plot([x - radius, x + radius], [y, y], color='black')
+            ax.plot([x, x], [y - radius, y + radius], color='black')
+        return
+
+
     # styling for gates drawn as rectangles
     rect_ops = {
         'linestyle': get_gate_rect_style(gate),
@@ -434,8 +465,23 @@ def draw_gate_body(gate, column, rectangles, plt, ax):
     # each rectangle is labelled
     label = get_gate_label(gate)
     for rect in rectangles:
-        pos = (mean(x[i] for x in rect) for i in [0,1])
-        plt.text(*pos, s=label, va='center', ha='center')
+
+        # measurement gate has a bespoke graphic
+        if isinstance(gate, M):
+            arc, line = get_measure_symbol(gate, rect)
+            ax.add_patch(arc)
+            ax.add_line(line)
+        
+        # SqrtSWAP gate uses mpl raw text
+        elif isinstance(gate, SqrtSwap):
+            pos = (mean(x[i] for x in rect) for i in [0,1])
+            plt.text(*pos, s=r'$\sqrt{SWAP}$', va='center', ha='center', fontsize=8)        
+
+        else:
+            pos = (mean(x[i] for x in rect) for i in [0,1])
+            plt.text(*pos, s=label, va='center', ha='center')
+
+    return
 
 
 def draw_gate(gate, column, num_qubits, plt, ax):
@@ -445,7 +491,7 @@ def draw_gate(gate, column, num_qubits, plt, ax):
     # draw vertical connector lines (at back)
     for line in lines:
 
-        # avoid drawing zero-length lines (eles matplotlib throws)
+        # avoid drawing zero-length lines (else matplotlib throws)
         if line[0] == line[1]:
             continue
 
@@ -456,25 +502,29 @@ def draw_gate(gate, column, num_qubits, plt, ax):
             zorder=layer.VERTICAL_CONNECTOR)
 
     # draw control dots
-    for dot in dots:
+    for i, dot in enumerate(dots):
         ax.add_patch(plt.Circle(
             dot, size.CONTROL_CIRCLE_RADIUS, 
-            color=get_control_qubit_color(gate), 
+            edgecolor='black',
+            facecolor=get_control_qubit_color(gate, i),
+            linewidth=1.5,
             zorder=layer.CONTROL_CIRCLE))
 
     # draw the main body of the gate; possibly labelled rectangles, or bespoke symbols
     draw_gate_body(gate, column, rectangles, plt, ax)
 
 
-def draw_circuit(gates):
-
-    # get matplotlib handles
-    ax = plt.gca()
+def draw_circuit(gates, savefig=False):
 
     # determine circuit layout
     gate_columns = get_circuit_columns(gates)
     num_columns = 1 + max(gate_columns)
     num_qubits = get_num_qubits(gates)
+
+    # get matplotlib handles and set the canvas size
+    mpl_figure = plt.figure()
+    mpl_figure.set_size_inches(num_columns, num_qubits)
+    ax = plt.gca()
 
     # draw horizontal qubit stave
     for q in range(num_qubits):
@@ -491,12 +541,15 @@ def draw_circuit(gates):
     pad = size.PLOT_PADDING
     ax.set_xlim(-.5 - pad, num_columns + pad +.5)
     ax.set_ylim(-.5 - pad, num_qubits  + pad +.5)
-
     # hide frame
     ax.axis('off')
 
     # force 1:1 aspect ratio (not crucial; fun to relax)
     ax.set_aspect('equal')
+
+    # save the figure
+    if savefig:
+        plt.savefig("circuit.png", bbox_inches='tight', dpi=300)
 
     # render circuit immediately
     plt.show()
