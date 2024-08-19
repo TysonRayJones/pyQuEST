@@ -985,5 +985,5 @@ cdef class Circuit(GlobalOperator):
         for k in range(self.c_operations.size()):
             (<BaseOperator>self.c_operations[k]).apply_to(c_register)
 
-    def draw(self):
-        draw_circuit(self)
+    def draw(self, theme="bw", filename=None):
+        draw_circuit(self, theme, filename)
