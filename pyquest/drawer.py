@@ -68,7 +68,6 @@ from pyquest.initialisations import *
 
 '''
 TODO:
-    - option for QuantumColours colour theme
     - type hints + docstrings
 '''
 
@@ -105,6 +104,94 @@ class size:
 
     # radius of circle upon CX and CCX target qubits
     TARGET_CIRCLE_RADIUS = .2
+
+
+# class holding colors logic
+colors = None
+class Colors:
+    themes = {
+        "qm": {
+            "fig_color": "#2D2E44", # dark blue
+            "gate_edge_color": "white",
+            "gate_face_color": "#ff4342", # coral
+            "vertical_connector_color": "white",
+            "control_qubit_color": "white",
+            "qubit_stave_color": "white",
+            "label_color": "white",
+            "decoherence_color" : "blue",
+            "initialisations_color" : "blue",
+            "phase_gate_color" : "#ff4342",
+            "meas_gate_color" : "#03a0b5" # teal
+        },
+        "dark": {
+            "fig_color": "black",
+            "gate_edge_color": "white",
+            "gate_face_color": "black",
+            "vertical_connector_color": "white",
+            "control_qubit_color": "white",
+            "qubit_stave_color": "white",
+            "label_color": "white",
+            "decoherence_color" : "black",
+            "initialisations_color" : "black",
+            "phase_gate_color" : "white",
+            "meas_gate_color" : "black"
+        },
+        "bw": {
+            "fig_color": "white",
+            "gate_edge_color": "black",
+            "gate_face_color": "white",
+            "vertical_connector_color": "gray",
+            "control_qubit_color": "black",
+            "qubit_stave_color": "lightgray",
+            "label_color": "black",
+            "decoherence_color" : "white",
+            "initialisations_color" : "white",
+            "phase_gate_color" : "black",
+            "meas_gate_color" : "white"
+        }
+    }
+
+    def __init__(self, theme="bw"):
+        self.theme = theme
+        self.colors = self.themes.get(theme, self.themes["bw"])
+
+    def get_fig_color(self):
+        return self.colors["fig_color"]
+
+    def get_gate_edge_color(self):
+        return self.colors["gate_edge_color"]
+
+    def get_gate_face_color(self, gate):
+
+        if hasattr(pyquest.decoherence, type(gate).__name__):
+            return self.colors["decoherence_color"]
+        
+        elif hasattr(pyquest.initialisations, type(gate).__name__):
+            return self.colors["initialisations_color"]
+        
+        elif isinstance(gate, Phase):
+            return self.colors["phase_gate_color"]
+        
+        elif isinstance(gate, M):
+            return self.colors["meas_gate_color"]
+        
+        else:
+            return self.colors["gate_face_color"]
+
+    def get_vertical_connector_color(self):
+        return self.colors["vertical_connector_color"]
+
+    def get_control_qubit_color(self):
+        return self.colors["control_qubit_color"]
+    
+    def get_anticontrol_qubit_color(self):
+        return self.colors["fig_color"]
+
+    def get_qubit_stave_color(self):
+        return self.colors["qubit_stave_color"]
+
+    def get_label_color(self):
+        return self.colors["label_color"]
 
 
 
@@ -282,6 +369,7 @@ def get_measure_symbol(gate, rect):
         theta2=180,
         fill=False,
         linewidth=1.5,
+        color=colors.get_label_color(),
         zorder=layer.GATE_BODY        
     )
 
@@ -290,7 +378,7 @@ def get_measure_symbol(gate, rect):
     line = mlines.Line2D(
         [x, x + 0.35 * w],
         [y_0, y_0 + 0.35 * w],
-        color='black',
+        color=colors.get_label_color(),
         zorder=layer.GATE_BODY,
     )
 
@@ -309,52 +397,6 @@ def get_gate_rect_style(gate):
 
     # all other operators have solid lines
     return "solid"
-
-# TODO bespoke QM colours when colourtheme='qm'
-def get_gate_rect_color(gate):
-
-    # # decoherence channels are red
-    # if hasattr(pyquest.decoherence, type(gate).__name__):
-    #     return "red"
-
-    # all other operators are black
-    return "black"
-
-# TODO bespoke QM colours when colourtheme='qm'
-def get_gate_face_color(gate):
-
-    if isinstance(gate, Phase):
-        return "black"
-
-    # generic gates have rectangle bodies with white faces
-    return "white"
-
-# TODO bespoke QM colours when colourtheme='qm'
-def get_vertical_connector_color(gate):
-
-    # default
-    return "gray"
-
-
-def get_control_qubit_color(gate, i):
-
-    # black for controls, white for anti-controls when drawing U gate
-    if isinstance(gate, U) and gate.control_pattern:
-        return "black" if gate.control_pattern[i] == 1 else "white"
-
-    # default
-    return "black"
-
-
-def get_qubit_stave_color(qubit, num_qubits):
-
-    # qubit-specific stave colours... for some reason...
-    a, b = .05, .2
-    return colormaps['binary'](b + (a-b) * qubit/float(num_qubits))
-
-    # but I won't blame you for doing a boring fixed colour, like...
-    return "lightgray"
-
 
 
 '''
@@ -421,9 +463,9 @@ def get_gate_graphic_components(gate, column, num_qubits):
 
 def draw_gate_body(gate, column, rectangles, plt, ax):
 
-    # gate-specific styling for special operators (which aren't drawn as rectangles)
+    # gate-specific styling for special operators
     special_opts = {
-        'color':  get_gate_face_color(gate),
+        'color':  colors.get_gate_face_color(gate),
         'zorder': layer.GATE_BODY}
 
     # SWAP gates ignore rectangles and draw X at every target
@@ -439,31 +481,31 @@ def draw_gate_body(gate, column, rectangles, plt, ax):
             ax.add_patch(plt.Circle((column+.5, q+.5), radius, **special_opts))
         return
 
+    # ordinary styling for rest
+    other_opts = {
+        'linestyle': get_gate_rect_style(gate),
+        'edgecolor': colors.get_gate_edge_color(),
+        'facecolor': colors.get_gate_face_color(gate),
+        'zorder':    layer.GATE_BODY}
+
     # CX and CCX gates draw bullseyes rather than rectangles at every target
     if isinstance(gate, X) and len(gate.controls) != 0:
         radius = size.TARGET_CIRCLE_RADIUS
         for q in gate.targets:
             # draw a circle
             x,y  = column + .5, q + .5
-            ax.add_patch(plt.Circle((x,y), radius, linestyle='-', edgecolor='black', facecolor='white', linewidth=1.5))
+            ax.add_patch(plt.Circle((x,y), radius, linewidth=1.5, **other_opts))
             # draw the inner cross
-            ax.plot([x - radius, x + radius], [y, y], color='black')
-            ax.plot([x, x], [y - radius, y + radius], color='black')
+            ax.plot([x - radius, x + radius], [y, y], color=colors.get_gate_edge_color())
+            ax.plot([x, x], [y - radius, y + radius], color=colors.get_gate_edge_color())
         return
-
-
-    # styling for gates drawn as rectangles
-    rect_ops = {
-        'linestyle': get_gate_rect_style(gate),
-        'edgecolor': get_gate_rect_color(gate),
-        'facecolor': get_gate_face_color(gate),
-        'zorder':    layer.GATE_BODY}
-
+    
     for rect in rectangles:
-        ax.add_patch(plt.Polygon(rect, **rect_ops))
+        ax.add_patch(plt.Polygon(rect, **other_opts))
 
     # each rectangle is labelled
     label = get_gate_label(gate)
+    label_color = colors.get_label_color()
     for rect in rectangles:
 
         # measurement gate has a bespoke graphic
@@ -475,11 +517,11 @@ def draw_gate_body(gate, column, rectangles, plt, ax):
         # SqrtSWAP gate uses mpl raw text
         elif isinstance(gate, SqrtSwap):
             pos = (mean(x[i] for x in rect) for i in [0,1])
-            plt.text(*pos, s=r'$\sqrt{SWAP}$', va='center', ha='center', fontsize=8)        
+            plt.text(*pos, s=r'$\sqrt{SWAP}$', va='center', ha='center', fontsize=8, color=label_color)        
 
         else:
             pos = (mean(x[i] for x in rect) for i in [0,1])
-            plt.text(*pos, s=label, va='center', ha='center')
+            plt.text(*pos, s=label, va='center', ha='center', color=label_color)
 
     return
 
@@ -498,15 +540,21 @@ def draw_gate(gate, column, num_qubits, plt, ax):
         (a,b),(c,d) = line
         plt.plot(
             (a,c), (b,d), 
-            color=get_vertical_connector_color(gate), 
+            color=colors.get_vertical_connector_color(), 
             zorder=layer.VERTICAL_CONNECTOR)
 
-    # draw control dots
+    # Draw control dots
     for i, dot in enumerate(dots):
+        control_color = (
+            colors.get_control_qubit_color() if not isinstance(gate, U) or not gate.control_pattern
+            else colors.get_control_qubit_color() if gate.control_pattern[i] == 1
+            else colors.get_anticontrol_qubit_color()
+        )
+
         ax.add_patch(plt.Circle(
             dot, size.CONTROL_CIRCLE_RADIUS, 
-            edgecolor='black',
-            facecolor=get_control_qubit_color(gate, i),
+            edgecolor=colors.get_gate_edge_color(),
+            facecolor=control_color,
             linewidth=1.5,
             zorder=layer.CONTROL_CIRCLE))
 
@@ -514,7 +562,7 @@ def draw_gate(gate, column, num_qubits, plt, ax):
     draw_gate_body(gate, column, rectangles, plt, ax)
 
 
-def draw_circuit(gates, savefig=False):
+def draw_circuit(gates, theme = "bw", filename = None):
 
     # determine circuit layout
     gate_columns = get_circuit_columns(gates)
@@ -526,11 +574,19 @@ def draw_circuit(gates, savefig=False):
     mpl_figure.set_size_inches(num_columns, num_qubits)
     ax = plt.gca()
 
+    # set global color theme
+    global colors
+    colors = Colors(theme)
+
+    # Set the background color
+    mpl_figure.patch.set_facecolor(colors.get_fig_color())
+    ax.set_facecolor(colors.get_fig_color())
+
     # draw horizontal qubit stave
     for q in range(num_qubits):
         plt.plot(
             [-.5, num_columns+.5], [q+.5, q+.5], 
-            color=get_qubit_stave_color(q, num_qubits), 
+            color=colors.get_qubit_stave_color(), 
             zorder=layer.QUBIT_STAVE)
 
     # draw each gate above stave
@@ -548,8 +604,8 @@ def draw_circuit(gates, savefig=False):
     ax.set_aspect('equal')
 
     # save the figure
-    if savefig:
-        plt.savefig("circuit.png", bbox_inches='tight', dpi=300)
+    if filename:
+        plt.savefig(filename, bbox_inches='tight', dpi=300)
 
     # render circuit immediately
     plt.show()
