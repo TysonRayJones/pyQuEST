@@ -103,48 +103,47 @@ class size:
 # class holding colors logic
 colors = None
 
-
 class Colors:
     themes = {
-        "qm": {
-            "fig_color": "#2D2E44",  # dark blue
-            "gate_edge_color": "white",
-            "gate_face_color": "#ff4342",  # coral
-            "vertical_connector_color": "white",
-            "control_qubit_color": "white",
-            "qubit_stave_color": "white",
-            "label_color": "white",
-            "decoherence_color": "blue",
-            "initialisations_color": "blue",
-            "phase_gate_color": "#ff4342",
-            "meas_gate_color": "#03a0b5",  # teal
+        "bw": {
+            "fig_color": "white",
+            "qubit_stave_color": "lightgray",
+            "vertical_connector_color": "gray",
+            "label_color": "black",
+            "initialisations_color": "white",
+            "decoherence_color": "white",
+            "operator_color": "white",
+            "gate_face_color": "white",
+            "gate_edge_color": "black",
+            "control_qubit_color": "black",
+            "meas_gate_color": "white"
         },
         "dark": {
             "fig_color": "black",
-            "gate_edge_color": "white",
-            "gate_face_color": "black",
-            "vertical_connector_color": "white",
-            "control_qubit_color": "white",
             "qubit_stave_color": "white",
+            "vertical_connector_color": "white",
             "label_color": "white",
-            "decoherence_color": "black",
             "initialisations_color": "black",
-            "phase_gate_color": "white",
-            "meas_gate_color": "black",
+            "decoherence_color": "black",
+            "operator_color": "black",
+            "gate_face_color": "black",
+            "gate_edge_color": "white",
+            "control_qubit_color": "white",
+            "meas_gate_color": "black"
         },
-        "bw": {
+        "qmt": {
             "fig_color": "white",
-            "gate_edge_color": "black",
-            "gate_face_color": "white",
-            "vertical_connector_color": "gray",
-            "control_qubit_color": "black",
-            "qubit_stave_color": "lightgray",
-            "label_color": "black",
-            "decoherence_color": "white",
-            "initialisations_color": "white",
-            "phase_gate_color": "black",
-            "meas_gate_color": "white",
-        },
+            "qubit_stave_color": "#2D2E44",
+            "vertical_connector_color": "#ff4342",
+            "label_color": "white",
+            "initialisations_color": "#2D2E44",
+            "decoherence_color": "gray",
+            "operator_color": "#3F1DF2",
+            "gate_face_color": "#ff4342",
+            "gate_edge_color": "#ff4342",
+            "control_qubit_color": "#ff4342",
+            "meas_gate_color": "#3F1DF2",
+        }
     }
 
     def __init__(self, theme="bw"):
@@ -154,40 +153,73 @@ class Colors:
     def get_fig_color(self):
         return self.colors["fig_color"]
 
-    def get_gate_edge_color(self):
-        return self.colors["gate_edge_color"]
+    def get_qubit_stave_color(self):
+        return self.colors["qubit_stave_color"]
+
+    def get_vertical_connector_color(self, gate):
+
+        if self.theme == "qmt":
+
+            if hasattr(pyquest.initialisations, type(gate).__name__):
+                return self.colors["initialisations_color"]
+
+            elif hasattr(pyquest.decoherence, type(gate).__name__):
+                return self.colors["decoherence_color"]
+
+            elif hasattr(pyquest.operators, type(gate).__name__):
+                return self.colors["operator_color"]
+        
+            elif isinstance(gate, M):
+                return self.colors["meas_gate_color"] 
+
+        return self.colors["vertical_connector_color"]
+
+    def get_label_color(self):
+        return self.colors["label_color"]
 
     def get_gate_face_color(self, gate):
 
-        if hasattr(pyquest.decoherence, type(gate).__name__):
-            return self.colors["decoherence_color"]
-
-        elif hasattr(pyquest.initialisations, type(gate).__name__):
+        if hasattr(pyquest.initialisations, type(gate).__name__):
             return self.colors["initialisations_color"]
 
+        elif hasattr(pyquest.decoherence, type(gate).__name__):
+            return self.colors["decoherence_color"]
+        
+        elif hasattr(pyquest.operators, type(gate).__name__):
+            return self.colors["operator_color"]
+
+        elif isinstance(gate, X) and len(gate.controls) != 0:
+            return self.colors["fig_color"]
+
         elif isinstance(gate, Phase):
-            return self.colors["phase_gate_color"]
+            return self.colors["control_qubit_color"]
 
         elif isinstance(gate, M):
             return self.colors["meas_gate_color"]
 
-        else:
-            return self.colors["gate_face_color"]
+        return self.colors["gate_face_color"]
 
-    def get_vertical_connector_color(self):
-        return self.colors["vertical_connector_color"]
+    def get_gate_edge_color(self, gate):
+
+        if hasattr(pyquest.decoherence, type(gate).__name__):
+            return self.colors["label_color"]
+
+        elif hasattr(pyquest.initialisations, type(gate).__name__):
+            return self.colors["label_color"]
+        
+        elif hasattr(pyquest.operators, type(gate).__name__) and self.theme == "qmt":
+            return self.colors["operator_color"]
+
+        elif isinstance(gate, X) and len(gate.controls) != 0:
+            return self.colors["control_qubit_color"]
+
+        elif isinstance(gate, M) and self.theme == "qmt":
+            return self.colors["meas_gate_color"]
+
+        return self.colors["gate_edge_color"]
 
     def get_control_qubit_color(self):
         return self.colors["control_qubit_color"]
-
-    def get_anticontrol_qubit_color(self):
-        return self.colors["fig_color"]
-
-    def get_qubit_stave_color(self):
-        return self.colors["qubit_stave_color"]
-
-    def get_label_color(self):
-        return self.colors["label_color"]
 
 
 """
@@ -478,7 +510,7 @@ def draw_gate_body(gate, column, rectangles, plt, ax):
     # ordinary styling for rest
     other_opts = {
         "linestyle": get_gate_rect_style(gate),
-        "edgecolor": colors.get_gate_edge_color(),
+        "edgecolor": colors.get_gate_edge_color(gate),
         "facecolor": colors.get_gate_face_color(gate),
         "zorder": layer.GATE_BODY,
     }
@@ -489,10 +521,10 @@ def draw_gate_body(gate, column, rectangles, plt, ax):
         for q in gate.targets:
             # draw a circle
             x, y = column + 0.5, q + 0.5
-            ax.add_patch(plt.Circle((x, y), radius, linewidth=1.5, **other_opts))
+            ax.add_patch(plt.Circle((x, y), radius, linewidth=1.8, **other_opts))
             # draw the inner cross
-            ax.plot([x - radius, x + radius], [y, y], color=colors.get_gate_edge_color())
-            ax.plot([x, x], [y - radius, y + radius], color=colors.get_gate_edge_color())
+            ax.plot([x - radius, x + radius], [y, y], color=colors.get_gate_edge_color(gate))
+            ax.plot([x, x], [y - radius, y + radius], color=colors.get_gate_edge_color(gate))
         return
 
     for rect in rectangles:
@@ -538,7 +570,7 @@ def draw_gate(gate, column, num_qubits, plt, ax):
         plt.plot(
             (a, c),
             (b, d),
-            color=colors.get_vertical_connector_color(),
+            color=colors.get_vertical_connector_color(gate),
             zorder=layer.VERTICAL_CONNECTOR,
         )
 
@@ -550,7 +582,7 @@ def draw_gate(gate, column, num_qubits, plt, ax):
             else (
                 colors.get_control_qubit_color()
                 if gate.control_pattern[i] == 1
-                else colors.get_anticontrol_qubit_color()
+                else colors.get_fig_color()
             )
         )
 
@@ -558,7 +590,7 @@ def draw_gate(gate, column, num_qubits, plt, ax):
             plt.Circle(
                 dot,
                 size.CONTROL_CIRCLE_RADIUS,
-                edgecolor=colors.get_gate_edge_color(),
+                edgecolor=colors.get_gate_edge_color(gate),
                 facecolor=control_color,
                 linewidth=1.5,
                 zorder=layer.CONTROL_CIRCLE,
