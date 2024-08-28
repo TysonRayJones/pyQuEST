@@ -136,15 +136,16 @@ class Colors:
             "qubit_stave_color": "#2D2E44",
             "vertical_connector_color": "#ff4342",
             "label_color": "white",
-            "initialisations_color": "#2D2E44",
-            "decoherence_color": "gray",
-            "operator_color": "#3F1DF2",
+            "initialisations_color": "gray",
+            "decoherence_color": "#d91328",
+            "operator_color": "#ff4342",
             "gate_face_color": "#ff4342",
             "gate_edge_color": "#ff4342",
             "control_qubit_color": "#ff4342",
-            "meas_gate_color": "#3F1DF2",
+            "meas_gate_color": "#2D2E44",
         }
     }
+
 
     def __init__(self, theme="bw"):
         self.theme = theme
@@ -191,6 +192,9 @@ class Colors:
         elif isinstance(gate, X) and len(gate.controls) != 0:
             return self.colors["fig_color"]
 
+        elif isinstance(gate, Swap):
+            return self.colors["control_qubit_color"]
+        
         elif isinstance(gate, Phase):
             return self.colors["control_qubit_color"]
 
